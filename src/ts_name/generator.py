@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 class TailnetNameGenerator:
     """Async generator for Tailscale tailnet fun names."""
 
-    API_URL = "https://login.tailscale.com/admin/api/tcd/offers"
-    SET_URL = "https://login.tailscale.com/admin/api/tcd"
+    API_URL = "https://login.tailscale.com/admin/api/public/admin/tcd/offers"
+    SET_URL = "https://login.tailscale.com/admin/api/public/admin/tcd"
     DEFAULT_DELAY = 0.5  # seconds, to avoid rate limiting
 
     def __init__(

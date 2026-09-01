@@ -67,13 +67,14 @@ class TestTailnetNameGenerator:
         """Test that API URL is correct."""
         assert (
             TailnetNameGenerator.API_URL
-            == "https://login.tailscale.com/admin/api/tcd/offers"
+            == "https://login.tailscale.com/admin/api/public/admin/tcd/offers"
         )
 
     def test_set_url_constant(self) -> None:
         """Test that SET URL is correct."""
         assert (
-            TailnetNameGenerator.SET_URL == "https://login.tailscale.com/admin/api/tcd"
+            TailnetNameGenerator.SET_URL
+            == "https://login.tailscale.com/admin/api/public/admin/tcd"
         )
 
     def test_default_delay_constant(self) -> None:
