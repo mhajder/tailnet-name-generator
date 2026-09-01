@@ -44,21 +44,21 @@ uv sync
 export TAILSCALE_COOKIE="your_cookie_here"
 
 # Find short names (max 10 characters) - results stream in real-time
-ts-name search -m 10
+ts-name search neko -m 10
 
 # Find names containing "king"
-ts-name search -w king
+ts-name search king
 
 # Find names containing either "yo" or "ya"
-ts-name search -w yo -w ya --operator or
+ts-name search --any yo,ya
 
 # Combine filters: names containing "king" AND shorter than 12 chars
-ts-name search -w king -m 12
+ts-name search king -m 12
 
 # Find 20 short names
 ts-name search -m 8 -l 20
 
-ts-name search -w neko-cat --auto-claim
+ts-name search neko-cat --claim
 ```
 
 ### Setting a Name
@@ -70,10 +70,10 @@ Once you've found a name you like, simply copy its token from the search results
 export TAILSCALE_COOKIE="your_cookie_here"
 
 # Set the tailnet name using the full token from search results
-ts-name set-name "awesome-name.ts.net/timestamp/hash"
+ts-name claim "awesome-name.ts.net/timestamp/hash"
 
 # Or explicitly with the cookie option
-ts-name set-name --cookie YOUR_COOKIE "awesome-name.ts.net/timestamp/hash"
+ts-name claim --cookie YOUR_COOKIE "awesome-name.ts.net/timestamp/hash"
 ```
 
 ### Search Command Options
@@ -83,19 +83,20 @@ Options:
   --cookie TEXT                 Tailscale authentication cookie (or set 
                                 TAILSCALE_COOKIE env var) [required]
   
-  -w, --words TEXT             Words to filter for (can be used multiple times)
+  TERMS...                      Terms that must all match
+
+  --any TEXT                    Comma-separated alternatives. One must match
   
   -m, --max-length INTEGER     Maximum length of tailnet name
   
   --min-length INTEGER         Minimum length of tailnet name
   
-  -o, --operator [and|or]      How to combine word filters (AND or OR)
-                               [default: and]
   
   -l, --limit INTEGER          Maximum number of results to return
-                               [default: 10]
+                               [default: 1]
   
-  --max-iterations INTEGER     Maximum number of API calls
+  --max-requests INTEGER       Maximum number of API requests
+                               [default: 1000]
   
   --delay FLOAT                Delay between API requests in seconds
                                [default: 0.5]
@@ -103,7 +104,7 @@ Options:
   --timeout FLOAT              Request timeout in seconds
                                [default: 30.0]
 
-  --auto-claim                 Claim the first matching name and stop
+  --claim                      Claim the first matching name and stop
   
   -v, --verbose                Enable verbose logging
   
@@ -120,19 +121,19 @@ Searches for names with max 8 characters and returns up to 20 matches. Results s
 
 ### Find names with specific keywords
 ```bash
-ts-name search -w king -w ratio
+ts-name search king ratio
 ```
 Finds names containing BOTH "king" AND "ratio" (AND operator is default).
 
 ### Find names with any keyword
 ```bash
-ts-name search -w cool -w awesome --operator or -l 5
+ts-name search --any cool,awesome -l 5
 ```
 Finds names containing either "cool" OR "awesome" and returns up to 5 matches.
 
 ### Combine length and keyword filters
 ```bash
-ts-name search -w king -m 10 --min-length 5
+ts-name search king -m 10 --min-length 5
 ```
 Finds names containing "king" that are between 5 and 10 characters long.
 
@@ -140,7 +141,7 @@ Finds names containing "king" that are between 5 and 10 characters long.
 ```bash
 export TAILSCALE_COOKIE="your_cookie"
 # From search results, copy the full token and use it:
-ts-name set-name "awesome-name.ts.net/timestamp/hash"
+ts-name claim "awesome-name.ts.net/timestamp/hash"
 ```
 Sets your tailnet name to "awesome-name". The tcd (tailnet name) is automatically extracted from the token.
 

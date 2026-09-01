@@ -1,4 +1,4 @@
-"""Command-line interface for tailnet name generator."""
+"""Command-line interface for the tailnet name generator."""
 
 import asyncio
 import logging
@@ -8,13 +8,18 @@ from collections.abc import Callable
 import click
 import httpx
 
-from ts_name.filters import FilterOperator
 from ts_name.filters import create_filter
 from ts_name.generator import TailnetNameGenerator
 
 
+class DefaultSearchGroup(click.Group):
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if args and args[0] not in self.commands and args[0] not in {"-h", "--help"}:
+            args.insert(0, "search")
+        return super().parse_args(ctx, args)
+
+
 def _configure_logging(verbose: bool) -> None:
-    """Configure application logging after the CLI starts."""
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -68,26 +73,34 @@ class SearchProgress:
             )
 
 
+def _split_any_terms(value: str | None) -> list[str]:
+    if value is None:
+        return []
+    terms = [term.strip() for term in value.split(",") if term.strip()]
+    if not terms:
+        raise click.BadParameter("must contain at least one term")
+    return terms
+
+
 async def _stream_results(
     generator: TailnetNameGenerator,
     filter_fn: Callable[[str], bool],
-    max_iterations: int | None,
+    max_requests: int,
     limit: int,
     progress: SearchProgress,
-    auto_claim: bool,
+    claim: bool,
 ) -> int:
-    """Print matching names as the generator finds them."""
     count = 0
     header_shown = False
 
     async for name, token in generator.generate(
         filter_fn=filter_fn,
-        max_iterations=max_iterations,
+        max_iterations=max_requests,
         progress_fn=progress.update,
     ):
         progress.match()
         progress.clear()
-        if auto_claim:
+        if claim:
             await generator.set_name(name, token)
             click.echo(f"✓ Successfully claimed tailnet name: {name}")
             return 1
@@ -103,24 +116,17 @@ async def _stream_results(
     return count
 
 
-@click.group()
+@click.group(cls=DefaultSearchGroup)
 def main() -> None:
-    """Tailnet name generator and setter for Tailscale."""
-    pass
+    """Search for or claim Tailscale tailnet names."""
 
 
-@main.command()
+@main.command(help="Search generated tailnet names.")
+@click.argument("terms", nargs=-1)
 @click.option(
-    "--cookie",
-    envvar="TAILSCALE_COOKIE",
-    required=True,
-    help="Tailscale authentication cookie (or set TAILSCALE_COOKIE env var)",
-)
-@click.option(
-    "--words",
-    "-w",
-    multiple=True,
-    help="Words to filter for (can be used multiple times)",
+    "--any",
+    "any_terms",
+    help="Comma-separated alternatives. One must match.",
 )
 @click.option(
     "--max-length",
@@ -136,24 +142,18 @@ def main() -> None:
     help="Minimum length of tailnet name",
 )
 @click.option(
-    "--operator",
-    "-o",
-    type=click.Choice(["and", "or"], case_sensitive=False),
-    default="and",
-    help="How to combine word filters (AND or OR)",
-)
-@click.option(
     "--limit",
     "-l",
     type=click.IntRange(min=1),
-    default=10,
+    default=1,
     help="Maximum number of results to return",
 )
 @click.option(
-    "--max-iterations",
+    "--max-requests",
     type=click.IntRange(min=1),
-    default=None,
-    help="Maximum number of API calls",
+    default=1000,
+    show_default=True,
+    help="Maximum number of API requests",
 )
 @click.option(
     "--delay",
@@ -168,59 +168,47 @@ def main() -> None:
     help="Request timeout in seconds",
 )
 @click.option(
+    "--cookie",
+    envvar="TAILSCALE_COOKIE",
+    required=True,
+    help="Tailscale authentication cookie",
+)
+@click.option(
+    "--claim",
+    is_flag=True,
+    help="Claim the first matching name and stop",
+)
+@click.option(
     "--verbose",
     "-v",
     is_flag=True,
     help="Enable verbose logging",
 )
-@click.option(
-    "--auto-claim",
-    is_flag=True,
-    help="Claim the first matching name and stop",
-)
 def search(
-    cookie: str,
-    words: tuple[str, ...],
+    terms: tuple[str, ...],
+    any_terms: str | None,
     max_length: int | None,
     min_length: int | None,
-    operator: str,
     limit: int,
-    max_iterations: int | None,
+    max_requests: int,
     delay: float,
     timeout: float,
+    cookie: str,
+    claim: bool,
     verbose: bool,
-    auto_claim: bool,
 ) -> None:
-    """
-    Search for matching Tailscale tailnet fun names.
-
-    Examples:
-
-    \b
-    # Find names containing "king" and shorter than 10 chars
-    ts-name search --cookie YOUR_COOKIE -w king -m 10
-
-    \b
-    # Find names containing either "yo" or "ya"
-    ts-name search --cookie YOUR_COOKIE -w yo -w ya --operator or
-
-    \b
-    # Find short names (max 8 chars)
-    ts-name search --cookie YOUR_COOKIE -m 8
-    """
     _configure_logging(verbose)
+    alternatives = _split_any_terms(any_terms)
+    if not terms and not alternatives and max_length is None and min_length is None:
+        raise click.UsageError("provide search terms or use --any")
 
     filter_fn = create_filter(
-        words=list(words) or None,
+        all_terms=list(terms),
+        any_terms=alternatives,
         max_length=max_length,
         min_length=min_length,
-        operator=FilterOperator(operator.casefold()),
     )
-    generator = TailnetNameGenerator(
-        cookie=cookie,
-        delay=delay,
-        timeout=timeout,
-    )
+    generator = TailnetNameGenerator(cookie, delay=delay, timeout=timeout)
     progress = SearchProgress()
     progress.start()
 
@@ -229,10 +217,10 @@ def search(
             _stream_results(
                 generator,
                 filter_fn,
-                max_iterations,
+                max_requests,
                 limit,
                 progress,
-                auto_claim,
+                claim,
             )
         )
     except (asyncio.CancelledError, KeyboardInterrupt):
@@ -246,13 +234,7 @@ def search(
         raise click.ClickException("No matching tailnet names found.")
 
 
-@main.command()
-@click.option(
-    "--cookie",
-    envvar="TAILSCALE_COOKIE",
-    required=True,
-    help="Tailscale authentication cookie (or set TAILSCALE_COOKIE env var)",
-)
+@main.command(help="Claim a tailnet name from an offer token.")
 @click.argument("token")
 @click.option(
     "--timeout",
@@ -261,36 +243,19 @@ def search(
     help="Request timeout in seconds",
 )
 @click.option(
+    "--cookie",
+    envvar="TAILSCALE_COOKIE",
+    required=True,
+    help="Tailscale authentication cookie",
+)
+@click.option(
     "--verbose",
     "-v",
     is_flag=True,
     help="Enable verbose logging",
 )
-def set_name(
-    cookie: str,
-    token: str,
-    timeout: float,
-    verbose: bool,
-) -> None:
-    """
-    Set the tailnet name to a specific offer.
-
-    TOKEN: The full token from the search results
-           (format: awesome-name.ts.net/timestamp/hash)
-
-    Examples:
-
-    \b
-    # Set a specific name using its token
-    ts-name set-name --cookie YOUR_COOKIE "awesome-name.ts.net/timestamp/hash"
-
-    \b
-    # Using environment variables
-    export TAILSCALE_COOKIE="your_cookie"
-    ts-name set-name "awesome-name.ts.net/timestamp/hash"
-    """
+def claim(token: str, timeout: float, cookie: str, verbose: bool) -> None:
     _configure_logging(verbose)
-
     parts = token.split("/")
     if len(parts) != 3 or any(not part for part in parts):
         raise click.ClickException(
@@ -298,13 +263,12 @@ def set_name(
         )
 
     tcd = parts[0]
-    generator = TailnetNameGenerator(cookie=cookie, timeout=timeout)
-
+    generator = TailnetNameGenerator(cookie, timeout=timeout)
     try:
         asyncio.run(generator.set_name(tcd, token))
     except (asyncio.CancelledError, KeyboardInterrupt):
         raise click.exceptions.Exit(130) from None
     except httpx.HTTPError as error:
-        raise click.ClickException(f"Failed to set tailnet name: {error}") from error
+        raise click.ClickException(f"Failed to claim tailnet name: {error}") from error
 
-    click.echo(f"✓ Successfully set tailnet name to {tcd}")
+    click.echo(f"✓ Successfully claimed tailnet name: {tcd.removesuffix('.ts.net')}")

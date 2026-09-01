@@ -21,7 +21,7 @@ class TestCLI:
         result = runner.invoke(main, ["--help"])
         assert result.exit_code == 0
         assert "search" in result.output.lower()
-        assert "set-name" in result.output.lower()
+        assert "claim" in result.output.lower()
 
     def test_cli_search_help(self) -> None:
         """Test that search subcommand help works."""
@@ -29,13 +29,14 @@ class TestCLI:
         result = runner.invoke(main, ["search", "--help"])
         assert result.exit_code == 0
         assert "cookie" in result.output.lower()
-        assert "words" in result.output.lower()
+        assert "terms" in result.output.lower()
 
-    def test_cli_search_word_option(self) -> None:
-        """Test that word option is available in search."""
+    def test_cli_search_term_options(self) -> None:
+        """Test that term options are available in search."""
         runner = CliRunner()
         result = runner.invoke(main, ["search", "--help"])
-        assert "-w" in result.output or "--words" in result.output
+        assert "TERMS" in result.output
+        assert "--any" in result.output
 
     def test_cli_search_length_options(self) -> None:
         """Test that length options are available in search."""
@@ -44,13 +45,12 @@ class TestCLI:
         assert "-m" in result.output or "--max-length" in result.output
         assert "--min-length" in result.output
 
-    def test_cli_search_operator_option(self) -> None:
-        """Test that operator option is available in search."""
+    def test_cli_search_any_option(self) -> None:
+        """Test that the any option is available in search."""
         runner = CliRunner()
         result = runner.invoke(main, ["search", "--help"])
-        assert "-o" in result.output or "--operator" in result.output
-        assert "and" in result.output.lower()
-        assert "or" in result.output.lower()
+        assert "--any" in result.output
+        assert "alternatives" in result.output.lower()
 
     def test_cli_search_limit_option(self) -> None:
         """Test that limit option is available in search."""
@@ -58,22 +58,16 @@ class TestCLI:
         result = runner.invoke(main, ["search", "--help"])
         assert "-l" in result.output or "--limit" in result.output
 
-    def test_cli_search_examples_in_help(self) -> None:
-        """Test that search help contains usage examples."""
+    def test_cli_search_request_limit_option(self) -> None:
+        """Test that search shows its request limit option."""
         runner = CliRunner()
         result = runner.invoke(main, ["search", "--help"])
-        assert "Examples:" in result.output or "examples" in result.output.lower()
+        assert "--max-requests" in result.output
 
-    def test_cli_set_name_help(self) -> None:
-        """Test that set-name subcommand help works."""
+    def test_cli_claim_help(self) -> None:
+        """Test that claim command help works."""
         runner = CliRunner()
-        result = runner.invoke(main, ["set-name", "--help"])
+        result = runner.invoke(main, ["claim", "--help"])
         assert result.exit_code == 0
         assert "cookie" in result.output.lower()
-        assert "name" in result.output.lower() or "NAME" in result.output
-
-    def test_cli_set_name_examples(self) -> None:
-        """Test that set-name help contains examples."""
-        runner = CliRunner()
-        result = runner.invoke(main, ["set-name", "--help"])
-        assert "Examples:" in result.output or "examples" in result.output.lower()
+        assert "token" in result.output.lower()
