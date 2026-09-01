@@ -4,6 +4,7 @@ import asyncio
 import logging
 import sys
 from collections.abc import Callable
+from time import monotonic
 
 import click
 import httpx
@@ -28,6 +29,17 @@ def _configure_logging(verbose: bool) -> None:
     logging.getLogger("ts_name").setLevel(logging.DEBUG if verbose else logging.INFO)
 
 
+def _format_duration(seconds: float) -> str:
+    total_seconds = int(seconds)
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m {seconds:02d}s"
+    if minutes:
+        return f"{minutes}m {seconds:02d}s"
+    return f"{seconds}s"
+
+
 class SearchProgress:
     _frames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
@@ -36,6 +48,7 @@ class SearchProgress:
         self.offers_checked = 0
         self.matches = 0
         self._frame_index = 0
+        self._started_at = monotonic()
         self._interactive = sys.stderr.isatty()
 
     def start(self) -> None:
@@ -57,9 +70,13 @@ class SearchProgress:
         self.clear()
         click.echo(
             f"Checked {self.offers_checked} offers in {self.attempts} requests. "
-            f"Found {self.matches} matches.",
+            f"Found {self.matches} matches in {self.elapsed}.",
             err=True,
         )
+
+    @property
+    def elapsed(self) -> str:
+        return _format_duration(monotonic() - self._started_at)
 
     def _render(self) -> None:
         if self._interactive:
@@ -67,7 +84,8 @@ class SearchProgress:
             self._frame_index = (self._frame_index + 1) % len(self._frames)
             click.echo(
                 f"\r{frame} Searching... {self.offers_checked} offers checked "
-                f"({self.attempts} requests, {self.matches} matches)",
+                f"({self.attempts} requests, {self.matches} matches, "
+                f"{self.elapsed})",
                 nl=False,
                 err=True,
             )
