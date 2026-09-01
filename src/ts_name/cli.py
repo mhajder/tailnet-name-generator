@@ -74,6 +74,7 @@ async def _stream_results(
     max_iterations: int | None,
     limit: int,
     progress: SearchProgress,
+    auto_claim: bool,
 ) -> int:
     """Print matching names as the generator finds them."""
     count = 0
@@ -86,6 +87,10 @@ async def _stream_results(
     ):
         progress.match()
         progress.clear()
+        if auto_claim:
+            await generator.set_name(name, token)
+            click.echo(f"✓ Successfully claimed tailnet name: {name}")
+            return 1
         if not header_shown:
             click.echo("Streaming matching tailnet names:\n")
             header_shown = True
@@ -168,6 +173,11 @@ def main() -> None:
     is_flag=True,
     help="Enable verbose logging",
 )
+@click.option(
+    "--auto-claim",
+    is_flag=True,
+    help="Claim the first matching name and stop",
+)
 def search(
     cookie: str,
     words: tuple[str, ...],
@@ -179,6 +189,7 @@ def search(
     delay: float,
     timeout: float,
     verbose: bool,
+    auto_claim: bool,
 ) -> None:
     """
     Search for matching Tailscale tailnet fun names.
@@ -215,7 +226,14 @@ def search(
 
     try:
         count = asyncio.run(
-            _stream_results(generator, filter_fn, max_iterations, limit, progress)
+            _stream_results(
+                generator,
+                filter_fn,
+                max_iterations,
+                limit,
+                progress,
+                auto_claim,
+            )
         )
     except (asyncio.CancelledError, KeyboardInterrupt):
         raise click.exceptions.Exit(130) from None

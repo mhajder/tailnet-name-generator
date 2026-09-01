@@ -57,6 +57,8 @@ ts-name search -w king -m 12
 
 # Find 20 short names
 ts-name search -m 8 -l 20
+
+ts-name search -w neko-cat --auto-claim
 ```
 
 ### Setting a Name
@@ -100,6 +102,8 @@ Options:
   
   --timeout FLOAT              Request timeout in seconds
                                [default: 30.0]
+
+  --auto-claim                 Claim the first matching name and stop
   
   -v, --verbose                Enable verbose logging
   
