@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import sys
 from collections.abc import Callable
 
 import click
@@ -22,11 +23,57 @@ def _configure_logging(verbose: bool) -> None:
     logging.getLogger("ts_name").setLevel(logging.DEBUG if verbose else logging.INFO)
 
 
+class SearchProgress:
+    _frames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self) -> None:
+        self.attempts = 0
+        self.offers_checked = 0
+        self.matches = 0
+        self._frame_index = 0
+        self._interactive = sys.stderr.isatty()
+
+    def start(self) -> None:
+        self._render()
+
+    def update(self, attempts: int, offers_checked: int) -> None:
+        self.attempts = attempts
+        self.offers_checked = offers_checked
+        self._render()
+
+    def match(self) -> None:
+        self.matches += 1
+
+    def clear(self) -> None:
+        if self._interactive:
+            click.echo("\r\033[K", nl=False, err=True)
+
+    def finish(self) -> None:
+        self.clear()
+        click.echo(
+            f"Checked {self.offers_checked} offers in {self.attempts} requests. "
+            f"Found {self.matches} matches.",
+            err=True,
+        )
+
+    def _render(self) -> None:
+        if self._interactive:
+            frame = self._frames[self._frame_index]
+            self._frame_index = (self._frame_index + 1) % len(self._frames)
+            click.echo(
+                f"\r{frame} Searching... {self.offers_checked} offers checked "
+                f"({self.attempts} requests, {self.matches} matches)",
+                nl=False,
+                err=True,
+            )
+
+
 async def _stream_results(
     generator: TailnetNameGenerator,
     filter_fn: Callable[[str], bool],
     max_iterations: int | None,
     limit: int,
+    progress: SearchProgress,
 ) -> int:
     """Print matching names as the generator finds them."""
     count = 0
@@ -35,7 +82,10 @@ async def _stream_results(
     async for name, token in generator.generate(
         filter_fn=filter_fn,
         max_iterations=max_iterations,
+        progress_fn=progress.update,
     ):
+        progress.match()
+        progress.clear()
         if not header_shown:
             click.echo("Streaming matching tailnet names:\n")
             header_shown = True
@@ -160,15 +210,19 @@ def search(
         delay=delay,
         timeout=timeout,
     )
+    progress = SearchProgress()
+    progress.start()
 
     try:
         count = asyncio.run(
-            _stream_results(generator, filter_fn, max_iterations, limit)
+            _stream_results(generator, filter_fn, max_iterations, limit, progress)
         )
     except (asyncio.CancelledError, KeyboardInterrupt):
         raise click.exceptions.Exit(130) from None
     except httpx.HTTPError as error:
         raise click.ClickException(f"API request failed: {error}") from error
+    finally:
+        progress.finish()
 
     if count == 0:
         raise click.ClickException("No matching tailnet names found.")

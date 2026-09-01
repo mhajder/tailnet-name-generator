@@ -127,6 +127,7 @@ class TailnetNameGenerator:
         self,
         filter_fn: Callable[[str], bool] | None = None,
         max_iterations: int | None = None,
+        progress_fn: Callable[[int, int], None] | None = None,
     ) -> AsyncGenerator[tuple[str, str], None]:
         """
         Generate matching tailnet names asynchronously.
@@ -140,11 +141,14 @@ class TailnetNameGenerator:
             Tuples of (tailnet_name, token) for matching names
         """
         attempts = 0
+        offers_checked = 0
 
         try:
             async with self._create_client() as client:
                 while max_iterations is None or attempts < max_iterations:
                     attempts += 1
+                    if progress_fn is not None:
+                        progress_fn(attempts, offers_checked)
                     try:
                         offers = await self._fetch_offers(client)
                     except httpx.HTTPError as error:
@@ -155,6 +159,9 @@ class TailnetNameGenerator:
                         continue
 
                     for offer in offers:
+                        offers_checked += 1
+                        if progress_fn is not None:
+                            progress_fn(attempts, offers_checked)
                         tcd = offer.get("tcd")
                         token = offer.get("token")
                         if not isinstance(tcd, str) or not isinstance(token, str):
