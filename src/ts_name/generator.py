@@ -4,6 +4,7 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from collections.abc import Callable
+from typing import Any
 
 import httpx
 
@@ -31,9 +32,18 @@ class TailnetNameGenerator:
             delay: Delay between requests in seconds (default: 0.5)
             timeout: Request timeout in seconds (default: 30.0)
         """
+        if delay < 0:
+            raise ValueError("delay cannot be negative")
+        if timeout <= 0:
+            raise ValueError("timeout must be positive")
+
         self.cookie = cookie
         self.delay = delay
         self.timeout = timeout
+
+    def _create_client(self) -> httpx.AsyncClient:
+        """Create an HTTP client for Tailscale requests."""
+        return httpx.AsyncClient(timeout=self.timeout)
 
     def _get_headers(self) -> dict[str, str]:
         """Build request headers with authentication."""
@@ -58,7 +68,7 @@ class TailnetNameGenerator:
         headers["priority"] = "u=1, i"
         return headers
 
-    async def fetch_offers(self) -> list[dict]:
+    async def fetch_offers(self) -> list[dict[str, Any]]:
         """
         Fetch a single batch of tailnet name offers from the API.
 
@@ -68,16 +78,31 @@ class TailnetNameGenerator:
         Raises:
             httpx.HTTPError: If the API request fails
         """
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.get(
-                self.API_URL,
-                headers=self._get_headers(),
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data.get("data", {}).get("tcds", [])
+        async with self._create_client() as client:
+            return await self._fetch_offers(client)
 
-    def _is_default_tailscale_name(self, name: str) -> bool:
+    async def _fetch_offers(self, client: httpx.AsyncClient) -> list[dict[str, Any]]:
+        """Fetch offers using an existing HTTP client."""
+        response = await client.get(
+            self.API_URL,
+            headers=self._get_headers(),
+        )
+        response.raise_for_status()
+        data = response.json()
+        if not isinstance(data, dict):
+            return []
+
+        response_data = data.get("data")
+        if not isinstance(response_data, dict):
+            return []
+
+        offers = response_data.get("tcds")
+        if not isinstance(offers, list):
+            return []
+        return [offer for offer in offers if isinstance(offer, dict)]
+
+    @staticmethod
+    def _is_default_tailscale_name(name: str) -> bool:
         """
         Check if a name is a default Tailscale-generated name.
 
@@ -90,15 +115,13 @@ class TailnetNameGenerator:
         Returns:
             True if the name is a default Tailscale name, False otherwise
         """
-        if not name.lower().startswith("tail"):
-            return False
-
-        # Get the part after "tail"
+        name = name.casefold()
         remainder = name[4:]
-
-        # Check if remainder is all hexadecimal characters (no hyphens or other chars)
-        # Default names are like: tail1ab2, tailabcd, etc.
-        return bool(remainder) and all(c in "0123456789abcdefABCDEF" for c in remainder)
+        return (
+            name.startswith("tail")
+            and bool(remainder)
+            and all(character in "0123456789abcdef" for character in remainder)
+        )
 
     async def generate(
         self,
@@ -116,37 +139,38 @@ class TailnetNameGenerator:
         Yields:
             Tuples of (tailnet_name, token) for matching names
         """
-        iterations = 0
+        attempts = 0
 
         try:
-            while max_iterations is None or iterations < max_iterations:
-                try:
-                    offers = await self.fetch_offers()
-                    iterations += 1
+            async with self._create_client() as client:
+                while max_iterations is None or attempts < max_iterations:
+                    attempts += 1
+                    try:
+                        offers = await self._fetch_offers(client)
+                    except httpx.HTTPError as error:
+                        logger.warning("API request failed: %s", error)
+                        if max_iterations is not None and attempts >= max_iterations:
+                            raise
+                        await asyncio.sleep(self.delay)
+                        continue
 
                     for offer in offers:
-                        tcd = offer.get("tcd", "")
-                        token = offer.get("token", "")
-                        if not tcd or not token:
+                        tcd = offer.get("tcd")
+                        token = offer.get("token")
+                        if not isinstance(tcd, str) or not isinstance(token, str):
                             continue
 
-                        # Extract just the tailnet name (remove .ts.net suffix)
-                        tailnet_name = tcd.replace(".ts.net", "")
-
-                        # Always skip default Tailscale names (tail*)
-                        if self._is_default_tailscale_name(tailnet_name):
+                        tailnet_name = tcd.removesuffix(".ts.net")
+                        if not tailnet_name or self._is_default_tailscale_name(
+                            tailnet_name
+                        ):
                             continue
 
                         if filter_fn is None or filter_fn(tailnet_name):
-                            yield (tailnet_name, token)
+                            yield tailnet_name, token
 
-                    # Rate limiting delay
-                    await asyncio.sleep(self.delay)
-
-                except httpx.HTTPError as e:
-                    logger.error(f"API request failed: {e}")
-                    # Wait before retrying
-                    await asyncio.sleep(self.delay)
+                    if max_iterations is None or attempts < max_iterations:
+                        await asyncio.sleep(self.delay)
 
         except asyncio.CancelledError:
             logger.info("Generator cancelled")
@@ -169,7 +193,10 @@ class TailnetNameGenerator:
         Returns:
             List of tuples containing (tailnet_name, token)
         """
-        matches = []
+        if max_matches < 1:
+            raise ValueError("max_matches must be positive")
+
+        matches: list[tuple[str, str]] = []
         async for name, token in self.generate(filter_fn, max_iterations):
             matches.append((name, token))
             if len(matches) >= max_matches:
@@ -185,27 +212,21 @@ class TailnetNameGenerator:
             token: The token from the offer
 
         Returns:
-            True if successful, False otherwise
+            True if the request succeeds
 
         Raises:
             httpx.HTTPError: If the API request fails
         """
-        # Ensure tcd has .ts.net suffix
-        if not tcd.endswith(".ts.net"):
-            tcd = f"{tcd}.ts.net"
-
+        tcd = tcd if tcd.endswith(".ts.net") else f"{tcd}.ts.net"
         payload = {"tcd": tcd, "token": token}
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(
-                    self.SET_URL,
-                    headers=self._get_set_headers(),
-                    json=payload,
-                )
-                response.raise_for_status()
-                logger.info(f"Successfully set tailnet name to {tcd}")
-                return True
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to set tailnet name: {e}")
-            raise
+        async with self._create_client() as client:
+            response = await client.post(
+                self.SET_URL,
+                headers=self._get_set_headers(),
+                json=payload,
+            )
+            response.raise_for_status()
+
+        logger.info("Successfully set tailnet name to %s", tcd)
+        return True

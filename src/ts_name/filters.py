@@ -23,6 +23,10 @@ class FilterConfig:
 
     def __post_init__(self) -> None:
         """Validate filter configuration."""
+        if self.min_length is not None and self.min_length < 0:
+            raise ValueError("min_length cannot be negative")
+        if self.max_length is not None and self.max_length < 0:
+            raise ValueError("max_length cannot be negative")
         if (
             self.max_length is not None
             and self.min_length is not None
@@ -43,23 +47,16 @@ class FilterConfig:
         Returns:
             True if the name matches all criteria, False otherwise
         """
-        # Check length constraints
+        name = tailnet_name.casefold()
         if self.max_length is not None and len(tailnet_name) > self.max_length:
             return False
         if self.min_length is not None and len(tailnet_name) < self.min_length:
             return False
-
-        # No words to filter
         if not self.words:
             return True
 
-        # Apply AND/OR logic for word matching
-        word_matches = [word.lower() in tailnet_name.lower() for word in self.words]
-
-        if self.operator == FilterOperator.AND:
-            return all(word_matches)
-        else:  # OR
-            return any(word_matches)
+        matches = (word.casefold() in name for word in self.words)
+        return all(matches) if self.operator == FilterOperator.AND else any(matches)
 
 
 def create_filter(

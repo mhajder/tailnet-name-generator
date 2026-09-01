@@ -51,18 +51,6 @@ class TestTailnetNameGenerator:
         assert headers["content-type"] == "application/json"
         assert "x-csrf-token" not in headers
 
-    def test_generate_with_filter(self) -> None:
-        """Test that generator respects filter function."""
-        _gen = TailnetNameGenerator(cookie="dummy_cookie")
-
-        # Create a mock filter that only accepts names with "test"
-        def test_filter(name: str) -> bool:
-            return "test" in name.lower()
-
-        # Note: This test will fail without valid credentials
-        # It's mostly to verify the structure and async nature
-        # In real usage, you'd need valid Tailscale credentials
-
     def test_api_url_constant(self) -> None:
         """Test that API URL is correct."""
         assert (
