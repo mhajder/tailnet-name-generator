@@ -1,6 +1,6 @@
 [project]
 name = "tailnet-name-generator"
-version = "0.1.0"
+version = "0.2.0"
 description = "Async brute force generator for Tailscale tailnet fun names with advanced filtering"
 readme = "README.md"
 requires-python = ">=3.11"
