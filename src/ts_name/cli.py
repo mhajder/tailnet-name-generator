@@ -85,7 +85,7 @@ def _split_any_terms(value: str | None) -> list[str]:
 async def _stream_results(
     generator: TailnetNameGenerator,
     filter_fn: Callable[[str], bool],
-    max_requests: int,
+    max_requests: int | None,
     limit: int,
     progress: SearchProgress,
     claim: bool,
@@ -156,6 +156,11 @@ def main() -> None:
     help="Maximum number of API requests",
 )
 @click.option(
+    "--forever",
+    is_flag=True,
+    help="Search until the result limit is reached",
+)
+@click.option(
     "--delay",
     type=click.FloatRange(min=0),
     default=0.5,
@@ -191,6 +196,7 @@ def search(
     min_length: int | None,
     limit: int,
     max_requests: int,
+    forever: bool,
     delay: float,
     timeout: float,
     cookie: str,
@@ -217,7 +223,7 @@ def search(
             _stream_results(
                 generator,
                 filter_fn,
-                max_requests,
+                None if forever else max_requests,
                 limit,
                 progress,
                 claim,

@@ -63,6 +63,7 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(main, ["search", "--help"])
         assert "--max-requests" in result.output
+        assert "--forever" in result.output
 
     def test_cli_claim_help(self) -> None:
         """Test that claim command help works."""

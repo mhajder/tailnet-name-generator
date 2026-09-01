@@ -61,6 +61,12 @@ ts-name search -m 8 -l 20
 ts-name search neko-cat --claim
 ```
 
+Use `--forever` to search without a request cap:
+
+```bash
+ts-name search neko --forever
+```
+
 ### Setting a Name
 
 Once you've found a name you like, simply copy its token from the search results and use it:
@@ -97,6 +103,8 @@ Options:
   
   --max-requests INTEGER       Maximum number of API requests
                                [default: 1000]
+
+  --forever                    Search until the result limit is reached
   
   --delay FLOAT                Delay between API requests in seconds
                                [default: 0.5]
