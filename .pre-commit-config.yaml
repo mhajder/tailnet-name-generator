@@ -1,56 +1,79 @@
 fail_fast: false
+minimum_prek_version: "0.4.0"
+default_install_hook_types: [ pre-push, commit-msg, pre-commit ]
+exclude: |
+  (?x)^(
+    uv\.lock
+  )$
 
 repos:
-  - repo: https://github.com/abravalheri/validate-pyproject
-    rev: "0.26"
+  - repo: meta
     hooks:
-      - id: validate-pyproject
+      - id: identity
+        name: Print checked files
+        description: Print input to the static check hooks for troubleshooting
+      - id: check-hooks-apply
+        name: Check if all hooks apply to the repository
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
+  - repo: builtin
     hooks:
-      - id: prettier
-        types_or: [yaml, json5]
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.5
-    hooks:
-      - id: ruff-check
-        args: [--fix, --exit-non-zero-on-fix]
-      - id: ruff-format
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [ --maxkb=100 ]
 
   - repo: local
     hooks:
-      - id: ty
-        name: ty check
-        entry: uv run --isolated ty check
-        language: system
-        types: [python]
-        files: ^src/|^tests/
-        pass_filenames: false
+      - id: local-ruff-check
+        name: ruff check
+        entry: uv run ruff check --force-exclude --fix --exit-non-zero-on-fix
         require_serial: true
+        language: system
+        types: [ python ]
 
-  - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.3
-    hooks:
-      - id: codespell # See pyproject.toml for args
-        additional_dependencies:
-          - tomli
+      - id: local-ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude --exit-non-zero-on-format
+        require_serial: true
+        language: system
+        types: [ python ]
 
-  - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.18.0
-    hooks:
-      - id: commitizen
-      - id: commitizen-branch
+      - id: local-ty-check
+        name: ty check
+        entry: uv run ty check . --ignore unresolved-import
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: local-typos
+        name: typos
+        entry: uv run typos
+        language: system
+
+      - id: local-commitizen
+        name: commitizen check
+        entry: uv run cz check --allow-abort --commit-msg-file
+        language: system
+        stages: [ commit-msg ]
+
+      - id: local-commitizen-branch
+        name: commitizen branch check
+        entry: uv run cz check --rev-range origin/HEAD..HEAD
+        language: system
+        pass_filenames: false
+        always_run: true
         stages:
           - pre-push
 
-  - repo: local
-    hooks:
       - id: pytest
         name: pytest
         entry: uv run pytest
         language: system
-        types: [python]
+        types: [ python ]
         pass_filenames: false
         always_run: true

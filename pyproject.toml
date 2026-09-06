@@ -22,6 +22,7 @@ dev = [
     "pytest-asyncio",
     "ty",
     "prek",
+    "typos",
 ]
 
 [project.scripts]

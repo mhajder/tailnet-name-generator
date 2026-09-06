@@ -86,36 +86,36 @@ ts-name claim --cookie YOUR_COOKIE "awesome-name.ts.net/timestamp/hash"
 
 ```
 Options:
-  --cookie TEXT                 Tailscale authentication cookie (or set 
+  --cookie TEXT                 Tailscale authentication cookie (or set
                                 TAILSCALE_COOKIE env var) [required]
-  
+
   TERMS...                      Terms that must all match
 
   --any TEXT                    Comma-separated alternatives. One must match
-  
+
   -m, --max-length INTEGER     Maximum length of tailnet name
-  
+
   --min-length INTEGER         Minimum length of tailnet name
-  
-  
+
+
   -l, --limit INTEGER          Maximum number of results to return
                                [default: 1]
-  
+
   --max-requests INTEGER       Maximum number of API requests
                                [default: 1000]
 
   --forever                    Search until the result limit is reached
-  
+
   --delay FLOAT                Delay between API requests in seconds
                                [default: 0.5]
-  
+
   --timeout FLOAT              Request timeout in seconds
                                [default: 30.0]
 
   --claim                      Claim the first matching name and stop
-  
+
   -v, --verbose                Enable verbose logging
-  
+
   --help                       Show this message and exit.
 ```
 
