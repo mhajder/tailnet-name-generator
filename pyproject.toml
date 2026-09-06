@@ -16,13 +16,13 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "commitizen",
-    "ruff",
-    "pytest",
-    "pytest-asyncio",
-    "ty",
-    "prek",
-    "typos",
+    "commitizen>=4.18.0",
+    "prek>=0.4.0",
+    "pytest>=9.1.0",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.0",
+    "ty>=0.0.77",
+    "typos>=1.50.0",
 ]
 
 [project.scripts]
