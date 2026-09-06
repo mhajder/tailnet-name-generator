@@ -10,8 +10,8 @@ authors = [
 ]
 
 dependencies = [
-    "httpx>=0.24.0",
     "click>=8.0.0",
+    "httpx2>=2.12.0",
 ]
 
 [dependency-groups]

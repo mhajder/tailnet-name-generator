@@ -7,7 +7,7 @@ from collections.abc import Callable
 from time import monotonic
 
 import click
-import httpx
+import httpx2
 
 from ts_name.filters import create_filter
 from ts_name.generator import TailnetNameGenerator
@@ -25,7 +25,7 @@ def _configure_logging(verbose: bool) -> None:
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpx2").setLevel(logging.WARNING)
     logging.getLogger("ts_name").setLevel(logging.DEBUG if verbose else logging.INFO)
 
 
@@ -249,7 +249,7 @@ def search(
         )
     except (asyncio.CancelledError, KeyboardInterrupt):
         raise click.exceptions.Exit(130) from None
-    except httpx.HTTPError as error:
+    except httpx2.HTTPError as error:
         raise click.ClickException(f"API request failed: {error}") from error
     finally:
         progress.finish()
@@ -292,7 +292,7 @@ def claim(token: str, timeout: float, cookie: str, verbose: bool) -> None:
         asyncio.run(generator.set_name(tcd, token))
     except (asyncio.CancelledError, KeyboardInterrupt):
         raise click.exceptions.Exit(130) from None
-    except httpx.HTTPError as error:
+    except httpx2.HTTPError as error:
         raise click.ClickException(f"Failed to claim tailnet name: {error}") from error
 
     click.echo(f"✓ Successfully claimed tailnet name: {tcd.removesuffix('.ts.net')}")

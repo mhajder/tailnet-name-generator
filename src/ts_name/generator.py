@@ -6,7 +6,7 @@ from collections.abc import AsyncGenerator
 from collections.abc import Callable
 from typing import Any
 
-import httpx
+import httpx2
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +41,9 @@ class TailnetNameGenerator:
         self.delay = delay
         self.timeout = timeout
 
-    def _create_client(self) -> httpx.AsyncClient:
+    def _create_client(self) -> httpx2.AsyncClient:
         """Create an HTTP client for Tailscale requests."""
-        return httpx.AsyncClient(timeout=self.timeout)
+        return httpx2.AsyncClient(timeout=self.timeout)
 
     def _get_headers(self) -> dict[str, str]:
         """Build request headers with authentication."""
@@ -76,12 +76,12 @@ class TailnetNameGenerator:
             List of tailnet name offers with tcd and token
 
         Raises:
-            httpx.HTTPError: If the API request fails
+            httpx2.HTTPError: If the API request fails
         """
         async with self._create_client() as client:
             return await self._fetch_offers(client)
 
-    async def _fetch_offers(self, client: httpx.AsyncClient) -> list[dict[str, Any]]:
+    async def _fetch_offers(self, client: httpx2.AsyncClient) -> list[dict[str, Any]]:
         """Fetch offers using an existing HTTP client."""
         response = await client.get(
             self.API_URL,
@@ -151,7 +151,7 @@ class TailnetNameGenerator:
                         progress_fn(attempts, offers_checked)
                     try:
                         offers = await self._fetch_offers(client)
-                    except httpx.HTTPError as error:
+                    except httpx2.HTTPError as error:
                         logger.warning("API request failed: %s", error)
                         if max_iterations is not None and attempts >= max_iterations:
                             raise
@@ -222,7 +222,7 @@ class TailnetNameGenerator:
             True if the request succeeds
 
         Raises:
-            httpx.HTTPError: If the API request fails
+            httpx2.HTTPError: If the API request fails
         """
         tcd = tcd if tcd.endswith(".ts.net") else f"{tcd}.ts.net"
         payload = {"tcd": tcd, "token": token}
