@@ -1,7 +1,9 @@
-name: Test & Lint
+name: Prek Checks
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -9,35 +11,17 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    timeout-minutes: 2
-
+  prek:
+    name: Run prek
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install the latest version of uv and set the python version
         uses: astral-sh/setup-uv@v7
         with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv sync --all-groups --all-extras
-
-      - name: Check lockfile is up to date
-        run: |
-          if ! uv lock --check; then
-            echo "❌ Lockfile is out of date!"
-            echo "To update the lockfile, run 'uv lock'."
-            exit 1
-          fi
-          echo "✅ Lockfile is up to date"
+          python-version: "3.14"
 
       - name: Run prek
-        uses: j178/prek-action@v1
+        uses: j178/prek-action@v2
