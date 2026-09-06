@@ -1,3 +1,9 @@
+## v0.3.0 (2026-09-06)
+
+### Feat
+
+- update GitHub Actions workflow for Prek checks
+
 ## v0.2.0 (2026-09-01)
 
 ### Feat
